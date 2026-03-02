@@ -1,0 +1,20 @@
+# Python Dependencies for Job Search Automation
+
+# Core HTTP library for API requests
+requests>=2.31.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# Web scraping
+beautifulsoup4>=4.12.0
+selenium>=4.15.0
+
+# Data processing
+pandas>=2.1.0
+
+# Database (if needed for local storage)
+sqlalchemy>=2.0.0
+
+# Logging
+loguru>=0.7.0
