@@ -6,6 +6,17 @@
 
 This project automates the entire job search process by scraping job listings from multiple sources, scoring them using AI based on relevance criteria, and delivering a curated daily report of the best opportunities. Built with n8n, it demonstrates enterprise-grade workflow automation, API integration, and intelligent data processing.
 
+
+## 🚀 Live Demo
+
+**n8n Workflow**: [View Live Workflow](https://24748-6lmsk.irann8n.com/workflow/QejQEHHtRxQp8iuT)
+
+The automated workflow is built and running in n8n. It includes:
+- Schedule Trigger (runs daily at midnight)
+- HTTP Request (scrapes GitLab jobs from Greenhouse API)
+- OpenAI Integration (scores jobs based on relevance)
+
+
 ## What It Does
 
 1. **Automated Job Discovery**
