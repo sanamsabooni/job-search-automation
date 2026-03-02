@@ -1,269 +1,257 @@
-# Job Search Automation Pipeline
+# Job Search Automation with n8n and Google Gemini
 
-> AI-powered job search automation using n8n. Scrapes multiple job boards, scores listings with OpenAI, and delivers daily ranked results.
+> AI-powered job search automation that scrapes job boards, enhances listings with Google Gemini AI, and delivers organized results to Google Sheets.
 
-## Overview
+## 🎯 Overview
 
-This project automates the entire job search process by scraping job listings from multiple sources, scoring them using AI based on relevance criteria, and delivering a curated daily report of the best opportunities. Built with n8n, it demonstrates enterprise-grade workflow automation, API integration, and intelligent data processing.
+This project automates job searching by:
+- Fetching job listings from multiple sources (GitLab jobs via Greenhouse API)
+- Using **Google Gemini AI** (free tier) to extract skills and enhance descriptions
+- Storing results in Google Sheets for easy tracking
+- Processing up to 20 jobs per search with keyword filtering
 
+## ✨ Features
 
-## 🚀 Live Demo
+- **Interactive Form**: Popup form to enter job search keywords
+- **Smart Filtering**: Searches top 20 relevant jobs based on keywords
+- **AI Enhancement**: Google Gemini extracts skills and summarizes descriptions
+- **Google Sheets Integration**: Automatic data storage with proper formatting
+- **Zero Cost**: Uses free tiers of n8n (self-hosted), Gemini API, and Google Sheets
 
-**n8n Workflow**: [View Live Workflow](https://24748-6lmsk.irann8n.com/workflow/QejQEHHtRxQp8iuT)
+## 🏗️ Architecture
 
-The automated workflow is built and running in n8n. It includes:
-- Schedule Trigger (runs daily at midnight)
-- HTTP Request (scrapes GitLab jobs from Greenhouse API)
-- OpenAI Integration (scores jobs based on relevance)
+### Workflow Nodes:
+1. **Form Trigger** → Collects keywords from user
+2. **HTTP Request** → Fetches jobs from job boards
+3. **Code/Loop** → Splits job array into individual items
+4. **Edit Fields** → Extracts basic job data
+5. **Google Gemini** → AI enhancement for skills/descriptions
+6. **Google Sheets** → Stores results
 
+## 📋 Prerequisites
 
-## What It Does
+- n8n instance (self-hosted or n8n cloud)
+- Google account
+- Google Gemini API key (free)
 
-1. **Automated Job Discovery**
-   - Scrapes LinkedIn Jobs and Greenhouse job boards daily at 9 AM
-   - Searches for automation engineer positions across the United States
-   - Extracts job title, company, location, description, salary, and application URL
+## 🚀 Setup Instructions
 
-2. **Data Processing & Storage**
-   - Normalizes job data from different sources into a unified format
-   - Stores all listings in a MySQL database
-   - Prevents duplicate entries with upsert logic
+### 1. Get Google Gemini API Key (Free)
 
-3. **AI-Powered Scoring**
-   - Uses OpenAI GPT-4 to evaluate each job listing
-   - Scores jobs 1-10 based on:
-     - Automation/workflow experience requirements
-     - n8n, Python, or API integration skills
-     - Remote work opportunities
-     - Competitive salary ranges
-   - Provides reasoning for each score
+1. Visit [Google AI Studio](https://aistudio.google.com/apikey)
+2. Sign in with your Google account
+3. Click **"Get API key"** → **"Create API key"**
+4. Select or create a Google Cloud project
+5. Copy your API key and save it securely
 
-4. **Intelligent Filtering & Reporting**
-   - Filters jobs with scores above 7/10
-   - Ranks results by AI score
-   - Sends a daily email report with top matches
-   - Updates job scores in the database for tracking
+> 💡 The free tier includes generous rate limits perfect for job searching!
 
-## Architecture
+### 2. Set Up Google Sheets
 
+1. Create a new Google Sheet named **"CRM"**
+2. Create a tab named **"jobsearch-n8n-ai"**
+3. Add column headers:
+   - Job Title
+   - Company
+   - Location
+   - Job URL
+   - Description  
+   - Date Posted
+   - Skills
+   - Application Status
+
+### 3. Configure Google Cloud (for Sheets API)
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Enable **Google Sheets API**
+3. Enable **Google Drive API**
+4. Create OAuth 2.0 credentials:
+   - Application type: Web application
+   - Add redirect URI: `https://YOUR-N8N-INSTANCE/rest/oauth2-credential/callback`
+5. Save Client ID and Client Secret
+
+### 4. Import n8n Workflow
+
+**Current Working Workflow** (without Form/Gemini):
 ```
-┌─────────────────┐
-│  Schedule       │ Trigger: Daily at 9 AM
-│  Trigger        │
-└────────┬────────┘
-         │
-         ├──────────────┬──────────────┐
-         ▼              ▼              │
-┌─────────────┐  ┌─────────────┐      │
-│  LinkedIn   │  │ Greenhouse  │      │
-│  Scraper    │  │  Scraper    │      │
-└──────┬──────┘  └──────┬──────┘      │
-       │                │             │
-       └────────┬───────┘             │
-                ▼                     │
-       ┌────────────────┐             │
-       │ Parse &        │             │
-       │ Normalize      │             │
-       └───────┬────────┘             │
-               │                      │
-       ┌───────┴────────┐             │
-       ▼                ▼             │
-┌──────────────┐  ┌──────────────┐   │
-│   Store in   │  │  AI Scoring  │   │
-│   Database   │  │  (OpenAI)    │   │
-└──────────────┘  └──────┬───────┘   │
-                         │           │
-                         ▼           │
-                ┌────────────────┐   │
-                │ Extract &      │   │
-                │ Rank Scores    │   │
-                └───────┬────────┘   │
-                        │            │
-                ┌───────┴────────┐   │
-                ▼                ▼   │
-       ┌────────────────┐  ┌─────────────┐
-       │ Filter High-   │  │  Update DB  │
-       │ Priority Jobs  │  │  Scores     │
-       └───────┬────────┘  └─────────────┘
-               │
-               ▼
-       ┌────────────────┐
-       │ Send Email     │
-       │ Report         │
-       └────────────────┘
+Schedule Trigger → HTTP Request → Edit Fields → Google Sheets
 ```
 
-## Features
+**Enhanced Workflow** (with Form + Gemini):
+```
+Form Trigger → HTTP Request → Code (Split) → Edit Fields → Google Gemini → Google Sheets
+```
 
-- **Multi-Source Aggregation**: Combines jobs from LinkedIn, Greenhouse, and other boards
-- **AI-Driven Relevance Scoring**: GPT-4 evaluates job fit based on custom criteria
-- **Automated Daily Reports**: Email delivery of ranked job opportunities
-- **Data Persistence**: MySQL database tracks all listings and scores
-- **Duplicate Prevention**: Smart upsert logic prevents re-processing
-- **Timezone Support**: Configured for America/Los_Angeles
-- **Fully Autonomous**: Runs without manual intervention
+## 🔧 Detailed Node Configuration
 
-## Technology Stack
+### Form Trigger Node
 
-- **n8n**: Workflow automation platform
-- **OpenAI GPT-4**: Job scoring and relevance analysis
-- **MySQL**: Relational database for job storage
-- **MongoDB**: Document storage for job scores
-- **Node.js**: Custom JavaScript code nodes
-- **HTTP/REST APIs**: Job board integrations
-
-## Setup Instructions
-
-### Prerequisites
-
-- n8n installed (self-hosted or cloud)
-- MySQL database
-- MongoDB database
-- OpenAI API key
-- Email SMTP credentials
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/sanamsabooni/job-search-automation.git
-   cd job-search-automation
+1. Add **Form Trigger** node
+2. Configure form fields:
    ```
-
-2. **Set up the database**
-   
-   Create a MySQL database and table:
-   ```sql
-   CREATE DATABASE job_automation;
-   
-   USE job_automation;
-   
-   CREATE TABLE jobs (
-     id INT AUTO_INCREMENT PRIMARY KEY,
-     title VARCHAR(255) NOT NULL,
-     company VARCHAR(255),
-     location VARCHAR(255),
-     description TEXT,
-     url VARCHAR(512) UNIQUE,
-     posted_date DATE,
-     salary VARCHAR(100),
-     source VARCHAR(50),
-     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-   );
+   Field Name: keywords
+   Field Type: Text
+   Field Label: "Enter job search keywords (e.g., data analyst, python)"
+   Required: Yes
    ```
+3. Form Title: "Job Search Automation"
+4. Form Description: "Enter keywords to find top 20 matching jobs"
 
-3. **Import the n8n workflow**
-   
-   - Open your n8n instance
-   - Go to Workflows → Import from File
-   - Select `workflows/job-search-workflow.json`
+### HTTP Request Node
 
-4. **Configure credentials in n8n**
-   
-   Set up the following credentials:
-   - **MySQL**: Database connection (host, user, password, database)
-   - **MongoDB**: Connection string
-   - **OpenAI**: API key
-   - **Email (SMTP)**: Your email service credentials
+```
+Method: GET
+URL: https://boards-api.greenhouse.io/v1/boards/gitlab/jobs
+Query Parameters:
+  - content: {{ $json.keywords }} (from Form)
+```
 
-5. **Update workflow parameters**
-   
-   In the n8n workflow, customize:
-   - Job search keywords (default: "automation engineer")
-   - Location preferences
-   - AI scoring criteria
-   - Email recipient address
-   - Schedule (default: daily at 9 AM)
+### Code Node (Split Jobs Array)
 
-6. **Activate the workflow**
-   
-   Click the "Active" toggle in n8n to start the automation.
-
-## Usage
-
-Once activated, the workflow runs automatically on schedule. You can also:
-
-- **Manual Execution**: Click "Execute Workflow" in n8n to run immediately
-- **Monitor Runs**: View execution history in the n8n UI
-- **Check Database**: Query the `jobs` table to see all discovered listings
-- **Adjust Scoring**: Modify the OpenAI prompt in the "AI Scoring" node
-
-## Customization
-
-### Change Job Search Criteria
-
-Edit the "Scrape LinkedIn Jobs" and "Scrape Greenhouse Boards" nodes:
 ```javascript
+// Split the jobs array into individual items
+const jobs = items[0].json.jobs || [];
+
+// Return top 20 jobs
+return jobs.slice(0, 20).map(job => ({
+  json: { job }
+}));
+```
+
+### Edit Fields Node
+
+**Fields to Extract:**
+- `job_title`: `{{ $json.job.title }}`
+- `company`: "GitLab" (or dynamic from API)
+- `location`: `{{ $json.job.location.name }}`
+- `job_url`: `{{ $json.job.absolute_url }}`
+- `date_posted`: `{{ $json.job.updated_at }}`
+
+### Google Gemini Node
+
+1. Add **HTTP Request** node for Gemini
+2. Configure:
+```
+Method: POST
+URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent
+Authentication: None
+Headers:
+  - Content-Type: application/json
+  - x-goog-api-key: YOUR_GEMINI_API_KEY
+
+Body (JSON):
 {
-  "keywords": "your keywords here",
-  "location": "Your Location",
-  "f_TP": "1,2"  // 1=Full-time, 2=Part-time
+  "contents": [{
+    "parts": [{
+      "text": "Extract key skills from this job posting and provide a brief 2-sentence summary. Job Title: {{ $json.job_title }}. Location: {{ $json.location }}. URL: {{ $json.job_url }}.  Format: Skills: [list]  Summary: [text]"
+    }]
+  }]
 }
 ```
 
-### Modify AI Scoring Logic
-
-Update the prompt in the "AI Scoring with OpenAI" node:
-```
-Rate this job for relevance (1-10) based on:
-- [Your custom criteria]
-- [Another criterion]
-- [etc.]
-
-Provide score and brief reason.
+3. Add **Edit Fields** after Gemini to extract response:
+```javascript
+skills: {{ $json.candidates[0].content.parts[0].text.match(/Skills: (.+)/)[1] }}
+description: {{ $json.candidates[0].content.parts[0].text.match(/Summary: (.+)/)[1] }}
 ```
 
-### Add More Job Sources
+### Google Sheets Node
 
-Duplicate the scraper nodes and add new HTTP Request nodes targeting other job boards' APIs.
+**Operation**: Append Row
+**Document**: CRM
+**Sheet**: jobsearch-n8n-ai
 
-## Project Structure
+**Column Mappings**:
+- Job Title: `{{ $json.job_title }}`
+- Company: `{{ $json.company }}`
+- Location: `{{ $json.location }}`
+- Job URL: `{{ $json.job_url }}`
+- Description: `{{ $json.description }}` (from Gemini)
+- Date Posted: `{{ $json.date_posted }}`
+- Skills: `{{ $json.skills }}` (from Gemini)
+- Application Status: "New"
 
-```
-job-search-automation/
-├── workflows/
-│   └── job-search-workflow.json    # Main n8n workflow
-├── README.md                        # This file
-└── .gitignore
-```
+## 📊 Current Status
 
-## Troubleshooting
+✅ **Working Components:**
+- HTTP Request fetching job data
+- Edit Fields extracting job information
+- Google Sheets integration
+- Data successfully written to sheet
 
-**Workflow not triggering**: Check the cron expression in the Schedule Trigger node.
+🚧 **To Be Added:**
+- Form Trigger for keyword input
+- Code node to split jobs array (process all 20 jobs)
+- Google Gemini integration for AI enhancement
 
-**API errors**: Verify your OpenAI API key has sufficient credits.
+## 🎬 Usage
 
-**Database connection failed**: Confirm MySQL credentials and network access.
+### Current Workflow:
+1. Manually trigger workflow from n8n
+2. Fetches GitLab jobs
+3. Writes first job to Google Sheet
 
-**No jobs found**: Check if job board URLs are still valid; APIs may change.
+### Enhanced Workflow (After Setup):
+1. Open workflow form URL
+2. Enter job keywords (e.g., "automation engineer python")
+3. Submit form
+4. Workflow fetches top 20 matching jobs
+5. Gemini AI extracts skills and summaries
+6. All jobs saved to Google Sheet with AI insights
 
-**Email not sending**: Verify SMTP credentials and check spam folder.
+## 📝 Example Output
 
-## Future Enhancements
+| Job Title | Company | Location | Skills | Description | Status |
+|-----------|---------|----------|--------|-------------|--------|
+| Accounts Receivable Associate | GitLab | Remote, Ireland | Excel, SAP, Finance | Manage accounts receivable processes... | New |
 
-- [ ] Add more job board sources (Indeed, Glassdoor, etc.)
-- [ ] Web scraping for sites without APIs
-- [ ] Resume auto-application for high-scoring jobs
-- [ ] Slack/Discord notifications
-- [ ] Analytics dashboard
-- [ ] Machine learning for personalized scoring
-- [ ] Mobile app integration
+## 🔐 Security Notes
 
-## Contributing
+- Never commit API keys to Git
+- Use n8n's credential system for sensitive data
+- Gemini API key should be stored in n8n credentials
+- OAuth tokens are managed securely by n8n
 
-Contributions welcome! Please open an issue or submit a pull request.
+## 🐛 Troubleshooting
 
-## License
+### "No columns found" in Google Sheets
+- Ensure sheet has header row with column names
+- Refresh the Google Sheets node configuration
 
-MIT License - see LICENSE file for details.
+### Gemini API Rate Limits
+- Free tier: 60 requests/minute
+- Add delay between requests if processing many jobs
 
-## Author
+### Job Array Not Splitting
+- Check Code node has correct syntax
+- Verify HTTP Request returns `jobs` array
 
-**Sanam Sabooni**  
-Data Scientist & Automation Engineer  
-[GitHub](https://github.com/sanamsabooni) | [Portfolio](https://sanamsabooni.github.io)
+## 🚀 Next Steps
+
+1. Get Gemini API key from Google AI Studio
+2. Add Form Trigger node
+3. Add Code node to split jobs array
+4. Add Gemini HTTP Request node
+5. Test with keyword search
+6. Monitor Google Sheet results
+
+## 📚 Resources
+
+- [Google Gemini API Docs](https://ai.google.dev/gemini-api/docs)
+- [n8n Documentation](https://docs.n8n.io/)
+- [Greenhouse API](https://developers.greenhouse.io/)
+- [Google Sheets API](https://developers.google.com/sheets/api)
+
+## 📄 License
+
+MIT License - Feel free to use this for your job search!
+
+## 🤝 Contributing
+
+Contributions welcome! This is a portfolio project demonstrating workflow automation and AI integration.
 
 ---
 
-*Built with n8n, OpenAI, and automation expertise.*
+**Built with:** n8n • Google Gemini AI • Google Sheets • Node.js
+
+**Author:** Sanam Sabooni | [GitHub](https://github.com/sanamsabooni) | [Portfolio](https://sanamsabooni.github.io)
