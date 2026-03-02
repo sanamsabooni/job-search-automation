@@ -1,0 +1,183 @@
+{
+  "name": "Job Search Automation Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://www.linkedin.com/jobs/search",
+        "options": {
+          "queryParameters": {
+            "values": [
+              { "name": "keywords", "value": "automation engineer" },
+              { "name": "location", "value": "United States" },
+              { "name": "f_TP", "value": "1,2" }
+            ]
+          }
+        }
+      },
+      "name": "Scrape LinkedIn Jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 250]
+    },
+    {
+      "parameters": {
+        "url": "https://boards.greenhouse.io/api/jobs",
+        "options": {
+          "queryParameters": {
+            "values": [
+              { "name": "type", "value": "full_time" }
+            ]
+          }
+        }
+      },
+      "name": "Scrape Greenhouse Boards",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 350]
+    },
+    {
+      "parameters": {
+        "jsCode": "const jobs = [];\n\nfor (const item of $input.all()) {\n  const data = item.json;\n  jobs.push({\n    title: data.title || data.job_title,\n    company: data.company || data.company_name,\n    location: data.location,\n    description: data.description,\n    url: data.url || data.apply_url,\n    posted_date: data.posted_at || data.date_posted,\n    salary: data.salary_range || null,\n    source: item.pairedItem?.itemIndex === 0 ? 'linkedin' : 'greenhouse'\n  });\n}\n\nreturn jobs.map(job => ({ json: job }));"
+      },
+      "name": "Parse & Normalize Job Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO jobs (title, company, location, description, url, posted_date, salary, source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE updated_at = NOW()",
+        "options": {}
+      },
+      "name": "Store in Database",
+      "type": "n8n-nodes-base.mysql",
+      "typeVersion": 2,
+      "position": [850, 250]
+    },
+    {
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "text": "=Job Title: {{ $json.title }}\n\nCompany: {{ $json.company }}\n\nDescription: {{ $json.description }}\n\nRate this job for relevance (1-10) based on:\n- Automation/workflow experience\n- n8n, Python, or API integration skills\n- Remote work opportunity\n- Competitive salary\n\nProvide score and brief reason.",
+        "options": {
+          "model": "gpt-4"
+        }
+      },
+      "name": "AI Scoring with OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "position": [850, 350]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst scored = items.map(item => {\n  const aiResponse = item.json.output || item.json.response;\n  const scoreMatch = aiResponse.match(/Score:\\s*(\\d+)/i) || aiResponse.match(/(\\d+)\\s*\\/\\s*10/);\n  const score = scoreMatch ? parseInt(scoreMatch[1]) : 5;\n  \n  return {\n    json: {\n      ...item.json,\n      ai_score: score,\n      ai_reasoning: aiResponse\n    }\n  };\n}).sort((a, b) => b.json.ai_score - a.json.ai_score);\n\nreturn scored;"
+      },
+      "name": "Extract & Rank by Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.ai_score }}",
+              "operation": "larger",
+              "value2": 7
+            }
+          ]
+        }
+      },
+      "name": "Filter High-Priority Jobs",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 1,
+      "position": [1250, 250]
+    },
+    {
+      "parameters": {
+        "subject": "Daily Job Report - {{ $now.format('YYYY-MM-DD') }}",
+        "text": "=Found {{ $('Filter High-Priority Jobs').itemMatched }} high-priority jobs today!\n\nTop Matches:\n\n{{ $json.title }} at {{ $json.company }}\nScore: {{ $json.ai_score }}/10\nLocation: {{ $json.location }}\nURL: {{ $json.url }}\n\nAI Analysis:\n{{ $json.ai_reasoning }}\n\n---\n",
+        "options": {
+          "attachments": "file"
+        }
+      },
+      "name": "Send Email Report",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1450, 250]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "collection": "jobs",
+        "options": {
+          "upsert": true
+        }
+      },
+      "name": "Update Job Scores in DB",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1,
+      "position": [1250, 350]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          { "node": "Scrape LinkedIn Jobs", "type": "main", "index": 0 },
+          { "node": "Scrape Greenhouse Boards", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Scrape LinkedIn Jobs": {
+      "main": [[{ "node": "Parse & Normalize Job Data", "type": "main", "index": 0 }]]
+    },
+    "Scrape Greenhouse Boards": {
+      "main": [[{ "node": "Parse & Normalize Job Data", "type": "main", "index": 0 }]]
+    },
+    "Parse & Normalize Job Data": {
+      "main": [
+        [
+          { "node": "Store in Database", "type": "main", "index": 0 },
+          { "node": "AI Scoring with OpenAI", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "AI Scoring with OpenAI": {
+      "main": [[{ "node": "Extract & Rank by Score", "type": "main", "index": 0 }]]
+    },
+    "Extract & Rank by Score": {
+      "main": [
+        [
+          { "node": "Filter High-Priority Jobs", "type": "main", "index": 0 },
+          { "node": "Update Job Scores in DB", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Filter High-Priority Jobs": {
+      "main": [[{ "node": "Send Email Report", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "timezone": "America/Los_Angeles"
+  }
+}
